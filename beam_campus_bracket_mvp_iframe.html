@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beam Season 4</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --card-h: 180px; --base-gap: 28px; }
+    body { background:#0b0b0c; color:white; }
+
+    .match-card{width:340px;background:#fff;color:#0f172a;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,.05);overflow:hidden;display:grid;grid-template-rows:1fr 1fr;height:var(--card-h);transition:transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s cubic-bezier(.2,.8,.2,1), border-color .18s cubic-bezier(.2,.8,.2,1);will-change:transform, box-shadow}
+    .match-card:hover, .match-card:focus-within{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.25), 0 0 0 1px rgba(167,139,250,.35) inset;border-color:rgba(167,139,250,.5)}
+    .row{display:flex;align-items:center;justify-content:space-between;padding:20px 14px;gap:14px}
+    .row + .row{border-top:1px solid #f1f5f9}
+    .artist{display:flex;align-items:center;gap:14px;min-width:0}
+    .name{font-size:15px;font-weight:600;white-space:normal;line-height:1.4;overflow:hidden;text-overflow:ellipsis}
+    .name a{color:inherit;text-decoration:none}
+    .name a:hover,.name a:focus{ text-decoration:underline; outline:none }
+    .row{cursor:default}
+    .row.linked{cursor:pointer}
+    /* New lines layout for artist + track */
+    .lines{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .line-name{display:flex;align-items:center;gap:8px;min-width:0}
+    .line-name strong{font-size:18px;letter-spacing:-0.01em}
+    .line-song{display:flex;align-items:center;gap:8px;color:#475569;font-size:15px}
+    .line-song a{color:inherit;text-decoration:none}
+    .line-song a:hover,.line-song a:focus{ text-decoration:underline; outline:none }
+    .score{font-variant-numeric:tabular-nums;font-weight:800}
+    .loser .name{font-weight:500;color:#334155}
+    .loser .score{color:#94a3b8}
+    .avatar-fallback{height:40px;width:40px;border-radius:9999px;background:#111827;color:#cbd5e1;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
+    .avatar-ring{box-shadow:0 0 0 0 rgba(139,92,246,.0);transition:box-shadow .2s ease}
+    .row:hover .avatar-ring{box-shadow:0 0 0 2px rgba(139,92,246,.55)}
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce){
+      .match-card{transition:none}
+      .match-card:hover, .match-card:focus-within{transform:none}
+    }
+
+    .round{position:relative;min-width:340px}
+    #bracket{padding-left:24px; padding-right:24px;}
+    #scrollWrap{scroll-behavior:smooth; width:100vw; overflow-x:auto; scroll-snap-type:x mandatory; position:relative}
+    /* Edge fade hints for mobile */
+    #scrollWrap::before,#scrollWrap::after{content:"";position:absolute;top:0;bottom:0;width:36px;pointer-events:none;transition:opacity .2s;}
+    #scrollWrap::before{left:0;background:linear-gradient(90deg, rgba(11,11,12,1) 0%, rgba(11,11,12,0) 100%);opacity:.9}
+    #scrollWrap::after{right:0;background:linear-gradient(270deg, rgba(11,11,12,1) 0%, rgba(11,11,12,0) 100%);opacity:.9}
+    #scrollWrap.hide-left::before{opacity:0}
+    #scrollWrap.hide-right::after{opacity:0}
+    .round{scroll-snap-align:center}
+    .dot{height:8px;width:8px;border-radius:9999px;background:#64748b;opacity:.4;transition:transform .2s,opacity .2s;position:relative}
+    .dot.active{opacity:1;transform:scale(1.2);background:#a78bfa}
+    .dot::after{content:attr(aria-label);position:absolute;bottom:14px;left:50%;transform:translateX(-50%) translateY(4px);background:#a78bfa;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;line-height:1;white-space:nowrap;opacity:0;pointer-events:none;box-shadow:0 4px 10px rgba(0,0,0,.25);transition:opacity .15s ease, transform .15s ease}
+    .dot::before{content:"";position:absolute;bottom:8px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#a78bfa;opacity:0;transition:opacity .15s ease}
+    .dot:hover::after,.dot:focus-visible::after{opacity:1;transform:translateX(-50%) translateY(0)}
+    .dot:hover::before,.dot:focus-visible::before{opacity:1}
+
+    /* Mobile tweaks */
+    @media (max-width: 640px){
+      :root{ --card-h: 170px; }
+      .match-card{ width:300px; }
+      .row{ padding:16px 12px; }
+      .avatar-fallback{ height:36px; width:36px; font-size:12px; }
+      .name{ font-size:14px; }
+      .line-song{ font-size:14px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-10 bg-black/80 backdrop-blur border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center font-bold">B</div>
+        <div>
+          <h1 id="title" class="text-lg font-semibold">Beam Campus — Region</h1>
+          <p class="text-xs text-white/60">Bracket UI MVP (offline-safe initials)</p>
+        </div>
+      </div>
+      <div class="hidden md:flex items-center gap-2 text-sm text-white/80">
+        <span class="opacity-70">Presented by</span>
+        <span class="font-medium" id="sponsor">Poppi</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="w-full px-3 md:px-4 py-6">
+    <div class="mb-4 flex items-center justify-between">
+      <span class="text-xs text-white/60">No external images. Mobile scrolls horizontally.</span>
+      <span id="updated" class="text-xs text-white/60"></span>
+    </div>
+
+    <div id="scrollWrap" class="overflow-x-auto snap">
+      <div id="bracket" class="flex justify-center items-start gap-4 sm:gap-8 min-w-[1180px] mx-auto"></div>
+    </div>
+    <!-- Mobile round selector -->
+    <div class="mt-3 sm:hidden">
+      <label for="roundSelect" class="sr-only">Select round</label>
+      <select id="roundSelect" class="w-full bg-zinc-900/60 border border-white/10 rounded-md px-3 py-2 text-sm">
+        <option>Loading rounds…</option>
+      </select>
+    </div>
+    <div id="snapDots" class="mt-4 flex items-center justify-center gap-2" aria-label="Round navigation"></div>
+  </main>
+
+  <script id="data" type="application/json">
+  {
+    "lastUpdated": "2025-11-06T21:28:00Z",
+    "region": "South",
+    "rounds": [
+      {
+        "name": "Round of 12",
+        "matches": [
+          {"a": {"name":"Aria Stone","score":83, "url":"https://thebeam.com/artist/aria-stone", "trackTitle":"Aria's Song", "trackUrl":"https://thebeam.com/track/aria-song"}, "b": {"name":"Zeke Fox","score":76, "url":"https://thebeam.com/artist/zeke-fox", "trackTitle":"Zeke's Song", "trackUrl":"https://thebeam.com/track/zeke-song"}},
+          {"a": {"name":"Milo Reyes","score":68}, "b": {"name":"Nova Kai","score":71}},
+          {"a": {"name":"Rhea Bloom","score":74}, "b": {"name":"Kairo Voss","score":69}},
+          {"a": {"name":"Indigo Vale","score":80}, "b": {"name":"Juno Park","score":77}},
+          {"a": {"name":"Sable Quinn","score":65}, "b": {"name":"Atlas Gray","score":72}},
+          {"a": {"name":"Lumi Skye","score":79}, "b": {"name":"Rex Arden","score":75}}
+        ]
+      },
+      { "name": "Quarterfinals (Top 2 Byes)", "matches": [ {"a": {"name":"","score":""}, "b": {"name":"","score":""}}, {"a": {"name":"","score":""}, "b": {"name":"","score":""}}, {"a": {"name":"","score":""}, "b": {"name":"","score":""}}, {"a": {"name":"","score":""}, "b": {"name":"","score":""}} ] },
+      { "name": "Semifinals", "matches": [ {"a": {"name":"","score":""}, "b": {"name":"","score":""}}, {"a": {"name":"","score":""}, "b": {"name":"","score":""}} ] },
+      { "name": "Final", "matches": [ {"a": {"name":"","score":""}, "b": {"name":"","score":""}} ] }
+    ]
+  }
+  </script>
+
+  <!-- RENDER SCRIPT (restores preview) -->
+  <script>
+  (function(){
+    try {
+      const DATA = JSON.parse(document.getElementById('data').textContent);
+      const SEASON_TITLE = 'Beam Season 4';
+      document.getElementById('title').innerHTML = `${SEASON_TITLE} <span class="text-white/50 text-sm font-normal">· ${DATA.region} Region</span>`;
+      document.getElementById('updated').textContent = `Last updated: ${new Date(DATA.lastUpdated).toLocaleString()}`;
+
+      const bracket   = document.getElementById('bracket');
+      const scrollWrap= document.getElementById('scrollWrap');
+      const CARD_H    = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card-h')) || 152;
+      const BASE      = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--base-gap')) || 28;
+
+      const safeScore = (s) => (s === null || s === undefined || s === "") ? null : Number(s);
+      const isWinner  = (a,b) => (safeScore(a?.score) ?? -Infinity) > (safeScore(b?.score) ?? -Infinity);
+      const initials  = (name="") => name.trim().split(/\s+/).map(s=>s[0]||"").slice(0,2).join("").toUpperCase();
+      const avatarFallback = (name) => `<div class="avatar-fallback avatar-ring">${initials(name||'') || '--'}</div>`;
+
+      const roundEls = [];
+
+      const columnHeights = DATA.rounds.map((round, idx) => {
+        const before = Math.pow(2, idx) * (BASE/2);
+        const between = Math.pow(2, idx) * BASE;
+        const m = round.matches.length;
+        return before + (m * CARD_H) + ((m - 1) * between) + before;
+      });
+      const maxH = Math.max(...columnHeights);
+
+      DATA.rounds.forEach((round, idx) => {
+        const col = document.createElement('div');
+        col.className = 'round flex flex-col';
+
+        const before  = Math.pow(2, idx) * (BASE/2);
+        const between = Math.pow(2, idx) * BASE;
+        const estH    = columnHeights[idx];
+        const padTop  = Math.max(0, (maxH - estH) / 2);
+
+        const title = document.createElement('div');
+        title.className = 'round-title text-center';
+        title.textContent = round.name;
+        col.appendChild(title);
+
+        const stack = document.createElement('div');
+        stack.style.paddingTop = padTop + 'px';
+
+        round.matches.forEach((m, i) => {
+          const aName = m?.a?.name || '';
+          const bName = m?.b?.name || '';
+          const aUrl  = m?.a?.url  || '';
+          const bUrl  = m?.b?.url  || '';
+          const aTrackTitle = m?.a?.trackTitle || '';
+          const bTrackTitle = m?.b?.trackTitle || '';
+          const aTrackUrl   = m?.a?.trackUrl   || '';
+          const bTrackUrl   = m?.b?.trackUrl   || '';
+          const aScore = m?.a?.score ?? '';
+          const bScore = m?.b?.score ?? '';
+
+          const card = document.createElement('div');
+          card.className = 'match-card';
+          card.tabIndex = 0;
+          card.style.marginTop = (i === 0 ? before : between) + 'px';
+          card.style.height = CARD_H + 'px';
+
+          const aWins = isWinner(m.a, m.b);
+          const bWins = isWinner(m.b, m.a);
+
+          card.innerHTML = `
+            <div class="row ${aWins ? 'winner' : 'loser'} ${aUrl ? 'linked' : ''}">
+              <div class="artist">
+                <span class="avatar-ring">${avatarFallback(aName)}</span>
+                <div class="lines">
+                  <div class="line-name">
+                    <span aria-hidden="true">🎤</span>
+                    <span class="name">${aUrl ? `<a href="${aUrl}" target="_blank" rel="noopener noreferrer"><strong>${aName}</strong></a>` : `<strong>${aName || '&nbsp;'}</strong>`}</span>
+                  </div>
+                  <div class="line-song">
+                    <span aria-hidden="true">▶</span>
+                    ${aTrackUrl ? `<a href="${aTrackUrl}" target="_blank" rel="noopener noreferrer">“${aTrackTitle || 'Track'}”</a>` : `“${aTrackTitle || ''}”`}
+                  </div>
+                </div>
+              </div>
+              <span class="score">${aScore === '' ? '' : aScore}</span>
+            </div>
+            <div class="row ${bWins ? 'winner' : 'loser'} ${bUrl ? 'linked' : ''}">
+              <div class="artist">
+                <span class="avatar-ring">${avatarFallback(bName)}</span>
+                <div class="lines">
+                  <div class="line-name">
+                    <span aria-hidden="true">🎤</span>
+                    <span class="name">${bUrl ? `<a href="${bUrl}" target="_blank" rel="noopener noreferrer"><strong>${bName}</strong></a>` : `<strong>${bName || '&nbsp;'}</strong>`}</span>
+                  </div>
+                  <div class="line-song">
+                    <span aria-hidden="true">▶</span>
+                    ${bTrackUrl ? `<a href="${bTrackUrl}" target="_blank" rel="noopener noreferrer">“${bTrackTitle || 'Track'}”</a>` : `“${bTrackTitle || ''}”`}
+                  </div>
+                </div>
+              </div>
+              <span class="score">${bScore === '' ? '' : bScore}</span>
+            </div>`;
+          stack.appendChild(card);
+        });
+
+        col.appendChild(stack);
+        bracket.appendChild(col);
+        roundEls.push(col);
+      });
+
+      const dotsWrap = document.getElementById('snapDots');
+      if (dotsWrap) {
+        const dots = DATA.rounds.map((r, i) => {
+          const d = document.createElement('button');
+          d.className = 'dot'; d.type = 'button';
+          d.setAttribute('aria-label', `Go to ${r.name}`);
+          d.addEventListener('click', () => centerOnCol(i));
+          dotsWrap.appendChild(d); return d;
+        });
+        const setActiveByNearest = () => {
+          const centerX = scrollWrap.scrollLeft + scrollWrap.clientWidth/2;
+          let best = 0, bestDist = Infinity;
+          roundEls.forEach((col, i) => {
+            const colCenter = col.offsetLeft + col.clientWidth/2;
+            const dist = Math.abs(colCenter - centerX);
+            if (dist < bestDist){ bestDist = dist; best = i; }
+          });
+          dots.forEach((d, i) => d.classList.toggle('active', i === best));
+        };
+        let raf = null;
+        scrollWrap.addEventListener('scroll', () => {
+          if (raf) return; raf = requestAnimationFrame(() => { setActiveByNearest(); raf = null; });
+        });
+      }
+
+      const centerOnCol = (idx) => {
+        const col = roundEls[idx]; if (!col) return;
+        const left = col.offsetLeft - (scrollWrap.clientWidth - col.clientWidth)/2;
+        scrollWrap.scrollLeft = Math.max(0, left);
+      };
+      const alignLeftToCol = (idx) => {
+        const col = roundEls[idx]; scrollWrap.scrollLeft = idx === 0 || !col ? 0 : col.offsetLeft;
+      };
+
+      requestAnimationFrame(() => alignLeftToCol(0));
+
+      // Populate mobile round selector
+      const selectEl = document.getElementById('roundSelect');
+      if (selectEl){
+        selectEl.innerHTML = DATA.rounds.map((r,i)=>`<option value="${i}">${r.name}</option>`).join('');
+        selectEl.addEventListener('change', (e)=>{
+          const idx = Number(e.target.value)||0; centerOnCol(idx);
+        });
+      }
+
+      // Edge fade visibility on scroll
+      const updateFades = () => {
+        const atStart = scrollWrap.scrollLeft <= 1;
+        const atEnd = Math.ceil(scrollWrap.scrollLeft + scrollWrap.clientWidth) >= scrollWrap.scrollWidth - 1;
+        scrollWrap.classList.toggle('hide-left', atStart);
+        scrollWrap.classList.toggle('hide-right', atEnd);
+        if (selectEl){
+          // sync mobile selector to nearest round
+          const centerX = scrollWrap.scrollLeft + scrollWrap.clientWidth/2;
+          let best = 0, bestDist = Infinity;
+          roundEls.forEach((col, i) => {
+            const colCenter = col.offsetLeft + col.clientWidth/2;
+            const dist = Math.abs(colCenter - centerX);
+            if (dist < bestDist){ bestDist = dist; best = i; }
+          });
+          selectEl.value = String(best);
+        }
+      };
+      updateFades();
+      scrollWrap.addEventListener('scroll', () => { if (raf) return; raf = requestAnimationFrame(() => { updateFades(); raf = null; }); });
+    } catch (e) { console.error('Bracket render failed', e); }
+  })();
+  </script>
+<script>
+  // Make the entire row clickable when a URL exists (name already links for a11y)
+  document.addEventListener('click', (e) => {
+    // If the user already clicked a real link, do nothing
+    if (e.target.closest('a')) return;
+    const row = e.target.closest('.row.linked');
+    if (!row) return;
+    const anchor = row.querySelector('.name a');
+    if (anchor && anchor.href) {
+      // open explicitly to avoid synthetic click recursion in some browsers
+      window.open(anchor.href, '_blank', 'noopener');
+    }
+  });
+</script>
+</body>
+</html>
